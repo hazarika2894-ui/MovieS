@@ -1,0 +1,6 @@
+{
+  "name": "ReelHouse",
+  "description": "Curated world cinema archive across Hollywood, Bollywood, and South Indian cinemas featuring personalized watchlists, user ratings, and multi-faceted search filters.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

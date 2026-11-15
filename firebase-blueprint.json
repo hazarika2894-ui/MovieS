@@ -1,0 +1,107 @@
+{
+  "entities": {
+    "WatchlistItem": {
+      "title": "WatchlistItem",
+      "description": "A film saved to an authenticated user's personal watchlist with viewing progress and personal notes.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the watchlist owner."
+        },
+        "movieId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Identifier of the curated movie."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["plan_to_watch", "watching", "watched"],
+          "description": "Current viewing status for this film."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Optional personal viewing note."
+        },
+        "addedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the film was added."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last status or note update."
+        }
+      },
+      "required": ["userId", "movieId", "status", "addedAt", "updatedAt"]
+    },
+    "UserRating": {
+      "title": "UserRating",
+      "description": "A verified user's star rating and optional review for a curated film.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the reviewer."
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Public display name shown alongside the review."
+        },
+        "movieId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Identifier of the rated movie."
+        },
+        "score": {
+          "type": "integer",
+          "description": "Star rating from 1 to 5."
+        },
+        "review": {
+          "type": "string",
+          "maxLength": 600,
+          "description": "Optional short critique or viewer note."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the rating was submitted."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the rating was last updated."
+        }
+      },
+      "required": ["userId", "authorName", "movieId", "score", "review", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/watchlist/{movieId}": {
+      "schema": {
+        "$ref": "#/entities/WatchlistItem"
+      },
+      "description": "Private personalized watchlist items owned by a specific user."
+    },
+    "/ratings/{ratingId}": {
+      "schema": {
+        "$ref": "#/entities/UserRating"
+      },
+      "description": "Community user ratings and reviews keyed deterministically by {userId}_{movieId}."
+    }
+  }
+}

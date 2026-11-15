@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidWatchlistItem(data, userId, movieId) {
+      return data.keys().hasAll(['userId', 'movieId', 'status', 'addedAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'movieId', 'status', 'notes', 'addedAt', 'updatedAt'])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.movieId is string
+        && data.movieId == movieId
+        && data.movieId.size() >= 1
+        && data.movieId.size() <= 64
+        && data.movieId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.status is string
+        && data.status in ['plan_to_watch', 'watching', 'watched']
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.addedAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserRating(data, ratingId) {
+      return data.keys().hasAll(['userId', 'authorName', 'movieId', 'score', 'review', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'authorName', 'movieId', 'score', 'review', 'createdAt', 'updatedAt'])
+        && data.userId is string
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.authorName is string
+        && data.authorName.size() >= 1
+        && data.authorName.size() <= 80
+        && data.movieId is string
+        && data.movieId.size() >= 1
+        && data.movieId.size() <= 64
+        && data.movieId.matches('^[a-zA-Z0-9_\\-]+$')
+        && ratingId == (data.userId + '_' + data.movieId)
+        && data.score is int
+        && data.score >= 1
+        && data.score <= 5
+        && data.review is string
+        && data.review.size() <= 600
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/watchlist/{movieId} {
+      allow get: if isSignedIn()
+        && isValidId(userId)
+        && isValidId(movieId)
+        && isOwner(userId);
+
+      allow list: if isSignedIn()
+        && isValidId(userId)
+        && isOwner(userId)
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if isVerified()
+        && isValidId(userId)
+        && isValidId(movieId)
+        && isOwner(userId)
+        && isValidWatchlistItem(incoming(), userId, movieId)
+        && incoming().addedAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isValidId(movieId)
+        && isOwner(userId)
+        && isValidWatchlistItem(incoming(), userId, movieId)
+        && incoming().userId == existing().userId
+        && incoming().movieId == existing().movieId
+        && incoming().addedAt == existing().addedAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['notes', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'updatedAt'])
+        );
+
+      allow delete: if isVerified()
+        && isValidId(userId)
+        && isValidId(movieId)
+        && isOwner(userId);
+    }
+
+    match /ratings/{ratingId} {
+      allow get: if isValidId(ratingId)
+        && resource.data.score is int
+        && resource.data.score >= 1
+        && resource.data.score <= 5;
+
+      allow list: if resource.data.score is int
+        && resource.data.score >= 1
+        && resource.data.score <= 5;
+
+      allow create: if isVerified()
+        && isValidId(ratingId)
+        && isValidUserRating(incoming(), ratingId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerified()
+        && isValidId(ratingId)
+        && isValidUserRating(incoming(), ratingId)
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().movieId == existing().movieId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['score', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['review', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['score', 'review', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['score', 'review', 'authorName', 'updatedAt'])
+        );
+
+      allow delete: if isVerified()
+        && isValidId(ratingId)
+        && existing().userId == request.auth.uid;
+    }
+  }
+}
